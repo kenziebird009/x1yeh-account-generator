@@ -336,22 +336,65 @@ def admin_stats():
 
 
 # ---------------------------------------------------------------------------
+# Health check (used by the app to verify the server is alive)
+# ---------------------------------------------------------------------------
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------------------------
 # Server runner
 # ---------------------------------------------------------------------------
 
-def run_server(host: str = "127.0.0.1", port: int = 8099) -> threading.Thread | None:
-    """Start Flask in a daemon thread. Returns the thread or None if port busy."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.bind((host, port))
-        sock.close()
-    except OSError:
-        return None
+_server_port: int = 0
+
+
+def get_server_port() -> int:
+    return _server_port
+
+
+def run_server(host: str = "127.0.0.1", preferred_port: int = 8099) -> int:
+    """Start Flask in a daemon thread. Returns the actual port, or 0 on failure."""
+    global _server_port
+
+    import requests as _requests
+
+    # Find an available port
+    ports = [preferred_port] + list(range(preferred_port + 1, preferred_port + 10))
+    chosen_port = 0
+    for p in ports:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind((host, p))
+            sock.close()
+            chosen_port = p
+            break
+        except OSError:
+            continue
+
+    if chosen_port == 0:
+        return 0
+
+    _server_port = chosen_port
 
     t = threading.Thread(
-        target=lambda: app.run(host=host, port=port, debug=False, use_reloader=False),
+        target=lambda: app.run(host=host, port=chosen_port, debug=False, use_reloader=False),
         daemon=True,
     )
     t.start()
-    time.sleep(0.5)
-    return t
+
+    # Wait for server to actually be ready (health check poll)
+    for _ in range(20):
+        time.sleep(0.25)
+        try:
+            r = _requests.get(f"http://{host}:{chosen_port}/health", timeout=1)
+            if r.status_code == 200:
+                return chosen_port
+        except Exception:
+            continue
+
+    # If we got here, the server never started
+    _server_port = 0
+    return 0

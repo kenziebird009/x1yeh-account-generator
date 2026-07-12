@@ -331,7 +331,16 @@ class AdminKeyDialog(ctk.CTkToplevel):
 class AdminFrame(ctk.CTkFrame):
     """Full admin panel: Dashboard, Keys, Stock, Logs."""
 
-    SERVER_URL = "http://127.0.0.1:8099"
+    @property
+    def SERVER_URL(self) -> str:
+        try:
+            from server import get_server_port
+            port = get_server_port()
+            if port:
+                return f"http://127.0.0.1:{port}"
+        except Exception:
+            pass
+        return "http://127.0.0.1:8099"
 
     def __init__(self, parent, api_client):
         super().__init__(parent, fg_color="transparent")
