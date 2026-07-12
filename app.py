@@ -18,7 +18,6 @@ from api import APIClient
 from gui import LoginFrame, MainApp, _get_logo_path
 from updater import UpdateChecker, ensure_app_folders
 from storage import init_db, seed_default_data
-from server import run_server, get_server_port
 
 
 # ---------------------------------------------------------------------------
@@ -117,25 +116,6 @@ class Application:
         # Initialize database
         init_db()
         seed_default_data()
-
-        # Start local server with health-check polling
-        port = run_server()
-        if port == 0:
-            # Show a simple tkinter error popup since CTk isn't initialized yet
-            import tkinter.messagebox as _mb
-            _mb.showerror(
-                "Server Error",
-                "Could not start the local server.\n\n"
-                "Possible causes:\n"
-                "- Another instance is already running\n"
-                "- Port 8099-8108 are all in use\n"
-                "- Firewall blocking the connection\n\n"
-                "Close any other copies of this app and try again.",
-            )
-            sys.exit(1)
-
-        self.config["api_base_url"] = f"http://127.0.0.1:{port}"
-        self.api.base_url = f"http://127.0.0.1:{port}"
 
         self._root = ctk.CTk()
         self._root.title("X1YEH Account Generator")

@@ -332,15 +332,9 @@ class AdminFrame(ctk.CTkFrame):
     """Full admin panel: Dashboard, Keys, Stock, Logs."""
 
     @property
-    def SERVER_URL(self) -> str:
-        try:
-            from server import get_server_port
-            port = get_server_port()
-            if port:
-                return f"http://127.0.0.1:{port}"
-        except Exception:
-            pass
-        return "http://127.0.0.1:8099"
+    def _admin(self):
+        from api import AdminAPI
+        return AdminAPI
 
     def __init__(self, parent, api_client):
         super().__init__(parent, fg_color="transparent")
@@ -349,23 +343,59 @@ class AdminFrame(ctk.CTkFrame):
         self._build()
 
     def _api(self, method: str, path: str, json_data=None, callback=None):
-        """Async API call to the local server."""
-        import requests as _r
+        """Async call to AdminAPI — direct database access, no server needed."""
         def _w():
             try:
-                url = f"{self.SERVER_URL}{path}"
-                if method == "GET":
-                    r = _r.get(url, timeout=10, params=json_data)
-                elif method == "POST":
-                    r = _r.post(url, json=json_data, timeout=10)
-                elif method == "DELETE":
-                    r = _r.delete(url, timeout=10)
-                elif method == "PUT":
-                    r = _r.put(url, json=json_data, timeout=10)
+                if path == "/admin/stats":
+                    data = self._admin.get_stats()
+                elif path == "/admin/categories":
+                    data = self._admin.get_categories()
+                elif path == "/admin/licenses":
+                    if method == "GET":
+                        data = self._admin.list_licenses(json_data.get("search", "") if json_data else "")
+                    elif method == "POST":
+                        data = self._admin.create_license(**json_data) if json_data else {"success": False}
+                    else:
+                        data = {"success": False}
+                elif path.startswith("/admin/licenses/") and path.endswith("/toggle"):
+                    lid = int(path.split("/")[3])
+                    data = self._admin.toggle_license(lid)
+                elif path.startswith("/admin/licenses/") and method == "DELETE":
+                    lid = int(path.split("/")[3])
+                    data = self._admin.delete_license(lid)
+                elif path.startswith("/admin/licenses/") and method == "PUT":
+                    lid = int(path.split("/")[3])
+                    data = self._admin.update_license(lid, **json_data) if json_data else {"success": False}
+                elif path.startswith("/admin/licenses/") and method == "GET":
+                    lid = int(path.split("/")[3])
+                    data = self._admin.get_license(lid)
+                elif path == "/admin/stock":
+                    if method == "GET":
+                        kwargs = json_data or {}
+                        data = self._admin.get_stock(**kwargs)
+                    elif method == "POST":
+                        data = self._admin.add_stock(**json_data) if json_data else {"success": False}
+                    else:
+                        data = {"success": False}
+                elif path == "/admin/stock/bulk":
+                    data = self._admin.add_stock_bulk(**json_data) if json_data else {"success": False}
+                elif path.startswith("/admin/stock/") and method == "DELETE":
+                    aid = int(path.split("/")[3])
+                    data = self._admin.delete_stock_account(aid)
+                elif path == "/admin/stock/clear":
+                    data = self._admin.clear_stock(**(json_data or {}))
+                elif path == "/admin/stock/delete-used":
+                    data = self._admin.delete_used_stock()
+                elif path == "/admin/stock/dedup":
+                    data = self._admin.dedup_stock()
+                elif path == "/admin/stock/export":
+                    kwargs = json_data or {}
+                    data = self._admin.export_stock(**kwargs)
+                elif path == "/admin/logs":
+                    data = self._admin.get_logs()
                 else:
-                    r = _r.get(url, timeout=10)
-                data = r.json()
-                self.after(0, lambda: callback(data))
+                    data = {"success": False, "error": f"Unknown endpoint: {path}"}
+                self.after(0, lambda d=data: callback(d))
             except Exception as e:
                 self.after(0, lambda: callback({"success": False, "error": str(e)}))
         threading.Thread(target=_w, daemon=True).start()
