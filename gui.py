@@ -329,7 +329,7 @@ class AdminKeyDialog(ctk.CTkToplevel):
 
 
 class AdminFrame(ctk.CTkFrame):
-    """Admin panel for managing users and licenses."""
+    """Admin panel for managing licenses, accounts, stock, and logs."""
 
     def __init__(self, parent, api_client):
         super().__init__(parent, fg_color="transparent")
@@ -346,35 +346,289 @@ class AdminFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self,
-            text="Manage licenses and user accounts",
+            text="Manage licenses, account stock, and view logs",
             font=ctk.CTkFont(*FONTS["small"]),
             text_color=COLORS["text_secondary"],
-        ).pack(anchor="w", pady=(0, 20))
+        ).pack(anchor="w", pady=(0, 15))
 
-        # Admin action cards
-        actions = [
-            ("User Management", "View and manage registered users"),
-            ("License Keys", "Generate, revoke, and manage licenses"),
-            ("Account Stock", "Manage available account inventory"),
-            ("System Logs", "View recent system activity and logs"),
-            ("Settings", "Configure global application settings"),
-        ]
+        # Scrollable frame for all admin content
+        self.scroll_canvas = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll_canvas.pack(fill="both", expand=True)
 
-        for title, desc in actions:
-            card = GlassCard(self)
-            card.pack(fill="x", pady=4, ipady=2)
+        self._build_create_license_section()
+        self._build_license_list_section()
+        self._build_add_stock_section()
+        self._build_logs_section()
+
+        # Load data
+        self._refresh_licenses()
+        self._refresh_logs()
+
+    # --- Create License ------------------------------------------------------
+
+    def _build_create_license_section(self):
+        card = GlassCard(self.scroll_canvas)
+        card.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            card, text="Create License Key",
+            font=ctk.CTkFont(*FONTS["subheading"]),
+            text_color=COLORS["text_primary"],
+        ).pack(anchor="w", padx=16, pady=(12, 10))
+
+        form = ctk.CTkFrame(card, fg_color="transparent")
+        form.pack(fill="x", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(form, text="Username", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
+        self.admin_user = ctk.CTkEntry(form, width=140, height=32,
+                                        font=ctk.CTkFont(*FONTS["small"]),
+                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                        placeholder_text="User")
+        self.admin_user.grid(row=0, column=1, padx=4, pady=2)
+
+        ctk.CTkLabel(form, text="Categories", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=2, sticky="w", padx=(8, 8), pady=2)
+        self.admin_cats = ctk.CTkEntry(form, width=180, height=32,
+                                        font=ctk.CTkFont(*FONTS["small"]),
+                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                        placeholder_text="VPN,Steam")
+        self.admin_cats.grid(row=0, column=3, padx=4, pady=2)
+
+        ctk.CTkLabel(form, text="Daily Limit", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=4, sticky="w", padx=(8, 8), pady=2)
+        self.admin_limit = ctk.CTkEntry(form, width=50, height=32,
+                                         font=ctk.CTkFont(*FONTS["small"]),
+                                         fg_color=COLORS["bg_input"], border_color=COLORS["border"])
+        self.admin_limit.insert(0, "5")
+        self.admin_limit.grid(row=0, column=5, padx=4, pady=2)
+
+        ctk.CTkButton(
+            form, text="Create Key", command=self._create_license,
+            width=100, height=32, font=ctk.CTkFont(*FONTS["small"]),
+            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            corner_radius=6,
+        ).grid(row=0, column=6, padx=(10, 0), pady=2)
+
+        self.admin_create_status = ctk.CTkLabel(
+            card, text="", font=ctk.CTkFont(*FONTS["small"]),
+            text_color=COLORS["success"],
+        )
+        self.admin_create_status.pack(anchor="w", padx=16, pady=(0, 8))
+
+    # --- License List --------------------------------------------------------
+
+    def _build_license_list_section(self):
+        card = GlassCard(self.scroll_canvas)
+        card.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            card, text="Active Licenses",
+            font=ctk.CTkFont(*FONTS["subheading"]),
+            text_color=COLORS["text_primary"],
+        ).pack(anchor="w", padx=16, pady=(12, 8))
+
+        self.license_list_frame = ctk.CTkFrame(card, fg_color="transparent")
+        self.license_list_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+    # --- Add Stock -----------------------------------------------------------
+
+    def _build_add_stock_section(self):
+        card = GlassCard(self.scroll_canvas)
+        card.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            card, text="Add Account Stock",
+            font=ctk.CTkFont(*FONTS["subheading"]),
+            text_color=COLORS["text_primary"],
+        ).pack(anchor="w", padx=16, pady=(12, 10))
+
+        form = ctk.CTkFrame(card, fg_color="transparent")
+        form.pack(fill="x", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(form, text="Category", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
+        self.stock_cat = ctk.CTkEntry(form, width=120, height=32,
+                                       font=ctk.CTkFont(*FONTS["small"]),
+                                       fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                       placeholder_text="VPN")
+        self.stock_cat.grid(row=0, column=1, padx=4, pady=2)
+
+        ctk.CTkLabel(form, text="Email", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=2, sticky="w", padx=(8, 8), pady=2)
+        self.stock_email = ctk.CTkEntry(form, width=180, height=32,
+                                         font=ctk.CTkFont(*FONTS["small"]),
+                                         fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                         placeholder_text="user@example.com")
+        self.stock_email.grid(row=0, column=3, padx=4, pady=2)
+
+        ctk.CTkLabel(form, text="Password", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=4, sticky="w", padx=(8, 8), pady=2)
+        self.stock_pass = ctk.CTkEntry(form, width=120, height=32,
+                                        font=ctk.CTkFont(*FONTS["small"]),
+                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                        placeholder_text="pass")
+        self.stock_pass.grid(row=0, column=5, padx=4, pady=2)
+
+        ctk.CTkButton(
+            form, text="Add", command=self._add_stock,
+            width=70, height=32, font=ctk.CTkFont(*FONTS["small"]),
+            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            corner_radius=6,
+        ).grid(row=0, column=6, padx=(10, 0), pady=2)
+
+        self.stock_status = ctk.CTkLabel(
+            card, text="", font=ctk.CTkFont(*FONTS["small"]),
+            text_color=COLORS["success"],
+        )
+        self.stock_status.pack(anchor="w", padx=16, pady=(0, 8))
+
+    # --- Logs ----------------------------------------------------------------
+
+    def _build_logs_section(self):
+        card = GlassCard(self.scroll_canvas)
+        card.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            card, text="Recent Activity",
+            font=ctk.CTkFont(*FONTS["subheading"]),
+            text_color=COLORS["text_primary"],
+        ).pack(anchor="w", padx=16, pady=(12, 8))
+
+        self.logs_frame = ctk.CTkFrame(card, fg_color="transparent")
+        self.logs_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+    # --- Actions -------------------------------------------------------------
+
+    def _create_license(self):
+        username = self.admin_user.get().strip() or "User"
+        cats_raw = self.admin_cats.get().strip()
+        permissions = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else ["VPN", "Netflix", "Steam", "Discord", "Rockstar"]
+        try:
+            daily_limit = int(self.admin_limit.get().strip())
+        except ValueError:
+            daily_limit = 5
+
+        def _callback(result):
+            if not result:
+                return
+            if result.get("success"):
+                key = result.get("license_key", "")
+                self.admin_create_status.configure(
+                    text=f"Created: {key}", text_color=COLORS["success"])
+                self._refresh_licenses()
+                self.winfo_toplevel().clipboard_clear()
+                self.winfo_toplevel().clipboard_append(key)
+                Toast.show(self.winfo_toplevel(), f"Key created and copied!", "success")
+            else:
+                self.admin_create_status.configure(
+                    text=result.get("error", "Failed"), text_color=COLORS["danger"])
+
+        import requests, threading
+        def _worker():
+            try:
+                resp = requests.post(
+                    "http://127.0.0.1:8099/admin/licenses",
+                    json={"username": username, "permissions": permissions, "daily_limit": daily_limit},
+                    timeout=10,
+                )
+                self.after(0, lambda: _callback(resp.json()))
+            except Exception as e:
+                self.after(0, lambda: _callback({"success": False, "error": str(e)}))
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _refresh_licenses(self):
+        import requests, threading
+        def _worker():
+            try:
+                resp = requests.get("http://127.0.0.1:8099/admin/licenses", timeout=10)
+                data = resp.json()
+                self.after(0, lambda: self._render_licenses(data.get("licenses", [])))
+            except Exception:
+                pass
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _render_licenses(self, licenses):
+        for w in self.license_list_frame.winfo_children():
+            w.destroy()
+
+        if not licenses:
+            ctk.CTkLabel(self.license_list_frame, text="No licenses found.",
+                         font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"]).pack(pady=4)
+            return
+
+        for lic in licenses:
+            row = ctk.CTkFrame(self.license_list_frame, fg_color="transparent")
+            row.pack(fill="x", pady=1)
+            key_short = lic["license_key"][:20] + "..."
+            perms = ", ".join(lic.get("permissions", []))
+            info = f"{key_short}  |  {lic['username']}  |  {perms}  |  Limit: {lic['daily_limit']}/day  |  {lic['status']}"
+            ctk.CTkLabel(row, text=info, font=ctk.CTkFont("Consolas", 10),
+                         text_color=COLORS["text_secondary"]).pack(side="left", padx=2)
+            ctk.CTkButton(row, text="Copy", width=50, height=22,
+                          font=ctk.CTkFont("Segoe UI", 9),
+                          fg_color=COLORS["bg_card"], hover_color=COLORS["sidebar_hover"],
+                          command=lambda k=lic["license_key"]: self._copy_key(k),
+                          corner_radius=4).pack(side="right", padx=2)
+
+    def _copy_key(self, key: str):
+        self.winfo_toplevel().clipboard_clear()
+        self.winfo_toplevel().clipboard_append(key)
+        Toast.show(self.winfo_toplevel(), "Key copied!", "success")
+
+    def _add_stock(self):
+        cat = self.stock_cat.get().strip()
+        email = self.stock_email.get().strip()
+        pw = self.stock_pass.get().strip()
+        if not cat or not email or not pw:
+            self.stock_status.configure(text="All fields required", text_color=COLORS["danger"])
+            return
+        import requests, threading
+        def _worker():
+            try:
+                resp = requests.post(
+                    "http://127.0.0.1:8099/admin/stock",
+                    json={"category": cat, "email": email, "password": pw},
+                    timeout=10,
+                )
+                data = resp.json()
+                if data.get("success"):
+                    self.after(0, lambda: self.stock_status.configure(text="Stock added!", text_color=COLORS["success"]))
+                    self.after(0, self._refresh_logs)
+                else:
+                    self.after(0, lambda: self.stock_status.configure(text=data.get("error", "Failed"), text_color=COLORS["danger"]))
+            except Exception as e:
+                self.after(0, lambda: self.stock_status.configure(text=str(e), text_color=COLORS["danger"]))
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _refresh_logs(self):
+        import requests, threading
+        def _worker():
+            try:
+                resp = requests.get("http://127.0.0.1:8099/admin/logs", timeout=10)
+                data = resp.json()
+                self.after(0, lambda: self._render_logs(data.get("admin_logs", [])))
+            except Exception:
+                pass
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _render_logs(self, logs):
+        for w in self.logs_frame.winfo_children():
+            w.destroy()
+        if not logs:
+            ctk.CTkLabel(self.logs_frame, text="No activity yet.",
+                         font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"]).pack(pady=4)
+            return
+        for log in logs[:10]:
             ctk.CTkLabel(
-                card,
-                text=title,
-                font=ctk.CTkFont(*FONTS["subheading"]),
-                text_color=COLORS["text_primary"],
-            ).pack(anchor="w", padx=16, pady=(12, 2))
-            ctk.CTkLabel(
-                card,
-                text=desc,
-                font=ctk.CTkFont(*FONTS["small"]),
+                self.logs_frame,
+                text=f"{log['created_at']}  {log['action']}  {log.get('detail', '')}",
+                font=ctk.CTkFont("Consolas", 10),
                 text_color=COLORS["text_muted"],
-            ).pack(anchor="w", padx=16, pady=(0, 12))
+                anchor="w",
+            ).pack(fill="x", pady=1)
 
 
 class LoginFrame(ctk.CTkFrame):
@@ -820,14 +1074,14 @@ class GenerateFrame(ctk.CTkFrame):
         )
         self.generate_btn.pack(anchor="w", pady=(0, 15))
 
-    def display_account(self, account: dict):
+    def display_account(self, account: dict, remaining: int = 0):
         """Show the generated account details."""
         self.current_account = account
         self.generate_btn.configure(state="normal", text="Generate Another")
 
         email = account.get("email", account.get("username", "N/A"))
         password = account.get("password", "N/A")
-        display = f"Email/Username: {email}\nPassword: {password}"
+        display = f"Email/Username: {email}\nPassword: {password}\n\nRemaining today: {remaining}"
 
         if not self.result_text.winfo_ismapped():
             self.result_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -1520,11 +1774,12 @@ class MainApp(ctk.CTkFrame):
         page.set_generating(False)
         if result.get("success", True):
             account = result.get("account", result)
-            page.display_account(account)
-            Toast.show(self, "Account generated successfully!", "success")
+            remaining = result.get("remaining_today", 0)
+            page.display_account(account, remaining)
+            Toast.show(self.winfo_toplevel(), f"Generated! {remaining} left today.", "success")
         else:
             error = result.get("error", "Failed to generate account.")
-            Toast.show(self, error, "error")
+            Toast.show(self.winfo_toplevel(), error, "error")
 
     def _handle_stock_refresh(self):
         self.api.get_stock_async(callback=self._on_stock_result)

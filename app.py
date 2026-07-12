@@ -17,6 +17,8 @@ import customtkinter as ctk
 from api import APIClient
 from gui import LoginFrame, MainApp, _get_logo_path
 from updater import UpdateChecker, ensure_app_folders
+from storage import init_db, seed_default_data
+from server import run_server
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +113,12 @@ class Application:
     def run(self) -> None:
         # Ensure all required folders exist
         ensure_app_folders(_get_app_dir())
+
+        # Initialize database and start local server
+        init_db()
+        seed_default_data()
+        run_server()
+        self.config["api_base_url"] = "http://127.0.0.1:8099"
 
         self._root = ctk.CTk()
         self._root.title("X1YEH Account Generator")

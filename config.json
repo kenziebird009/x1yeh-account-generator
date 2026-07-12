@@ -1,5 +1,5 @@
 {
-  "api_base_url": "https://api.example.com",
+  "api_base_url": "http://127.0.0.1:8099",
   "version_url": "https://raw.githubusercontent.com/kenziebird009/x1yeh-account-generator/main/version.json",
   "github_releases": "https://github.com/kenziebird009/x1yeh-account-generator/releases/latest",
   "remember_login": true,
