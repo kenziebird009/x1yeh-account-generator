@@ -1,0 +1,14 @@
+{
+  "api_base_url": "https://api.example.com",
+  "version_url": "https://raw.githubusercontent.com/YOUR_USER/account-generator/main/version.json",
+  "github_releases": "https://github.com/YOUR_USER/account-generator/releases/latest",
+  "remember_login": true,
+  "theme": "dark",
+  "launch_on_startup": false,
+  "animations": true,
+  "notification_sounds": false,
+  "check_for_updates": true,
+  "window_width": 1100,
+  "window_height": 700,
+  "version": "1.0.0"
+}
