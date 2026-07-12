@@ -1,7 +1,7 @@
 {
   "api_base_url": "https://api.example.com",
-  "version_url": "https://raw.githubusercontent.com/YOUR_USER/account-generator/main/version.json",
-  "github_releases": "https://github.com/YOUR_USER/account-generator/releases/latest",
+  "version_url": "https://raw.githubusercontent.com/kenziebird009/x1yeh-account-generator/main/version.json",
+  "github_releases": "https://github.com/kenziebird009/x1yeh-account-generator/releases/latest",
   "remember_login": true,
   "theme": "dark",
   "launch_on_startup": false,
