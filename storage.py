@@ -67,7 +67,7 @@ def init_db() -> None:
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             license_key  TEXT NOT NULL,
             category   TEXT NOT NULL,
-            account_id INTEGER REFERENCES account_stock(id),
+            account_id INTEGER REFERENCES account_stock(id) ON DELETE SET NULL,
             email      TEXT,
             success    INTEGER NOT NULL DEFAULT 1,
             error_msg  TEXT,
@@ -414,6 +414,7 @@ def get_stock_accounts(category: str = "", search: str = "", only_available: boo
 
 def delete_stock_account(account_id: int) -> bool:
     conn = _connect()
+    conn.execute("UPDATE generation_log SET account_id = NULL WHERE account_id = ?", (account_id,))
     conn.execute("DELETE FROM account_stock WHERE id = ?", (account_id,))
     conn.commit()
     conn.close()
@@ -422,9 +423,15 @@ def delete_stock_account(account_id: int) -> bool:
 
 def clear_stock(category: str = "") -> int:
     conn = _connect()
+    # Null out references in generation_log first to avoid FK errors
     if category:
+        conn.execute(
+            "UPDATE generation_log SET account_id = NULL WHERE account_id IN "
+            "(SELECT id FROM account_stock WHERE category = ?)", (category,)
+        )
         cur = conn.execute("DELETE FROM account_stock WHERE category = ?", (category,))
     else:
+        conn.execute("UPDATE generation_log SET account_id = NULL")
         cur = conn.execute("DELETE FROM account_stock")
     conn.commit()
     conn.close()
@@ -433,6 +440,7 @@ def clear_stock(category: str = "") -> int:
 
 def delete_used_stock() -> int:
     conn = _connect()
+    conn.execute("UPDATE generation_log SET account_id = NULL WHERE account_id IN (SELECT id FROM account_stock WHERE used = 1)")
     cur = conn.execute("DELETE FROM account_stock WHERE used = 1")
     conn.commit()
     conn.close()
@@ -457,6 +465,10 @@ def export_stock(category: str = "") -> str:
 
 def remove_duplicates() -> dict:
     conn = _connect()
+    conn.execute(
+        "UPDATE generation_log SET account_id = NULL WHERE account_id IN "
+        "(SELECT id FROM account_stock WHERE id NOT IN (SELECT MIN(id) FROM account_stock GROUP BY category, email))"
+    )
     cur = conn.execute(
         "DELETE FROM account_stock WHERE id NOT IN (SELECT MIN(id) FROM account_stock GROUP BY category, email)"
     )
