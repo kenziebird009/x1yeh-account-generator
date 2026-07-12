@@ -1,126 +1,105 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: ------------------------------------------------------------------
-::  X1YEH Account Generator - Setup + Build Script
-::  Downloads from GitHub if not found locally, installs everything,
-::  and builds the EXE to Downloads.
-:: ------------------------------------------------------------------
+:: ==================================================================
+::  X1YEH Account Generator - One-Click Build
+::  - Downloads project from GitHub if not found locally
+::  - Installs all dependencies
+::  - Builds EXE to Downloads
+:: ==================================================================
 
-set "PROJECT_DIR=%~dp0"
-set "PROJECT_DIR=%PROJECT_DIR:~0,-1%"
-cd /d "%PROJECT_DIR%"
-
-set "REQUIREMENTS=%PROJECT_DIR%\requirements.txt"
-set "CONFIG_JSON=%PROJECT_DIR%\config.json"
-set "ASSETS_DIR=%PROJECT_DIR%\assets"
-set "APP_PY=%PROJECT_DIR%\app.py"
+set "GITHUB_REPO=https://github.com/kenziebird009/x1yeh-account-generator.git"
 set "OUTDIR=%USERPROFILE%\Downloads"
-set "WORKDIR=%TEMP%\x1yeh_build_%RANDOM%"
+set "WORKDIR=%TEMP%\x1yeh_build"
 
 echo ==============================================
-echo    X1YEH Account Generator - Setup ^& Build
-echo ==============================================
-echo    Project dir: %PROJECT_DIR%
-echo    Output dir:  %OUTDIR%
+echo    X1YEH Account Generator - Build
 echo ==============================================
 echo.
 
-:: -- verify python --
+:: -- check python --
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Python 3.12+ required. Install from https://python.org
+    echo [ERROR] Python 3.12+ required.
+    echo         Download from https://python.org
     pause & exit /b 1
 )
 
-:: -- install / upgrade pip --
-echo [1/5] Setting up pip...
+:: -- check git --
+git --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Git required.
+    echo         Download from https://git-scm.com
+    pause & exit /b 1
+)
+
+:: -- step 1: clone or update project from GitHub --
+echo [1/5] Downloading project from GitHub...
+if exist "%WORKDIR%" rmdir /s /q "%WORKDIR%" 2>nul
+git clone --depth 1 "%GITHUB_REPO%" "%WORKDIR%" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to clone repo. Check your internet connection.
+    pause & exit /b 1
+)
+echo        Downloaded OK.
+
+:: -- step 2: install dependencies --
+echo [2/5] Installing dependencies...
 python -m pip install --upgrade pip --quiet 2>nul
 python -m pip install --upgrade setuptools wheel --quiet 2>nul
-
-:: -- install project dependencies (absolute paths) --
-echo [2/5] Installing project dependencies...
-if not exist "%REQUIREMENTS%" (
-    echo [ERROR] requirements.txt not found at: %REQUIREMENTS%
-    echo         Make sure you extracted the full project folder.
-    pause & exit /b 1
-)
-python -m pip install --force-reinstall --no-cache-dir -r "%REQUIREMENTS%"
+python -m pip install -r "%WORKDIR%\requirements.txt" --quiet
 if %errorlevel% neq 0 (
-    echo [WARN] Some packages may have failed. Trying alternate install...
-    python -m pip install requests customtkinter pillow pyinstaller cryptography
+    echo [WARN] Retrying with verbose install...
+    python -m pip install -r "%WORKDIR%\requirements.txt"
     if %errorlevel% neq 0 (
-        echo [ERROR] Critical packages failed to install.
-        pause & exit /b 1
+        echo [ERROR] Dependencies failed. Trying one-by-one...
+        python -m pip install requests customtkinter pillow pyinstaller cryptography
     )
 )
-echo        All dependencies OK.
+echo        Dependencies OK.
 
-:: -- verify source files --
+:: -- step 3: verify assets --
 echo [3/5] Verifying source files...
-if not exist "%APP_PY%" (
-    echo [ERROR] app.py not found at: %APP_PY%
+if not exist "%WORKDIR%\app.py" (
+    echo [ERROR] app.py missing from repo.
     pause & exit /b 1
 )
-if not exist "%CONFIG_JSON%" (
-    echo [WARN] config.json missing, creating default...
-    echo { > "%CONFIG_JSON%"
-    echo   "api_base_url": "https://api.example.com", >> "%CONFIG_JSON%"
-    echo   "version_url": "https://raw.githubusercontent.com/YOUR_USER/account-generator/main/version.json", >> "%CONFIG_JSON%"
-    echo   "remember_login": true, >> "%CONFIG_JSON%"
-    echo   "theme": "dark", >> "%CONFIG_JSON%"
-    echo   "check_for_updates": true, >> "%CONFIG_JSON%"
-    echo   "window_width": 1100, >> "%CONFIG_JSON%"
-    echo   "window_height": 700, >> "%CONFIG_JSON%"
-    echo   "version": "1.0.0" >> "%CONFIG_JSON%"
-    echo } >> "%CONFIG_JSON%"
-)
 
-:: -- build EXE --
+:: -- step 4: build EXE --
 echo [4/5] Building EXE...
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
+
 python -m PyInstaller ^
     --onefile ^
     --windowed ^
     --clean ^
     --noconfirm ^
     --distpath "%OUTDIR%" ^
-    --workpath "%WORKDIR%" ^
-    --specpath "%WORKDIR%" ^
-    --add-data "%CONFIG_JSON%;." ^
-    --add-data "%ASSETS_DIR%;assets" ^
+    --workpath "%TEMP%\pyi_work" ^
+    --specpath "%TEMP%\pyi_spec" ^
+    --add-data "%WORKDIR%\config.json;." ^
+    --add-data "%WORKDIR%\assets;assets" ^
     --name "X1YEH_AccountGen" ^
-    "%APP_PY%"
+    "%WORKDIR%\app.py"
 
 if %errorlevel% neq 0 (
-    echo [ERROR] Build failed. Check the output above for details.
+    echo [ERROR] Build failed.
     pause & exit /b 1
 )
 
-:: -- clean up --
-echo [5/5] Cleaning temp files and copying assets...
-if exist "%WORKDIR%" rmdir /s /q "%WORKDIR%" 2>nul
-if exist "%PROJECT_DIR%\build" rmdir /s /q "%PROJECT_DIR%\build" 2>nul
-for /d %%d in ("%PROJECT_DIR%\__pycache__") do rmdir /s /q "%%d" 2>nul
+:: -- step 5: clean up and copy extras --
+echo [5/5] Finalizing...
+xcopy "%WORKDIR%\assets" "%OUTDIR%\assets\" /E /I /Y >nul 2>&1
+copy /Y "%WORKDIR%\config.json" "%OUTDIR%\config.json" >nul 2>&1
+copy /Y "%WORKDIR%\version.json" "%OUTDIR%\version.json" >nul 2>&1
 
-:: copy assets + config alongside EXE so it runs standalone
-xcopy "%ASSETS_DIR%" "%OUTDIR%\assets\" /E /I /Y >nul 2>&1
-copy /Y "%CONFIG_JSON%" "%OUTDIR%\config.json" >nul 2>&1
-copy /Y "%PROJECT_DIR%\version.json" "%OUTDIR%\version.json" >nul 2>&1
+rmdir /s /q "%WORKDIR%" 2>nul
+rmdir /s /q "%TEMP%\pyi_work" 2>nul
+rmdir /s /q "%TEMP%\pyi_spec" 2>nul
 
-:: create a README shortcut for the user
 echo.
 echo ==============================================
-echo    BUILD SUCCESS !
-echo ==============================================
-echo    EXE:        %OUTDIR%\X1YEH_AccountGen.exe
-echo    Assets:     %OUTDIR%\assets\
-echo    Config:     %OUTDIR%\config.json
-echo    Version:    %OUTDIR%\version.json
-echo.
-echo    To upload updates to GitHub:
-echo      1. Update version.json with new version
-echo      2. Create a GitHub Release with the EXE .zip
-echo      3. Users will auto-update on next launch
+echo    SUCCESS
+echo    %OUTDIR%\X1YEH_AccountGen.exe
 echo ==============================================
 pause
