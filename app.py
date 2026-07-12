@@ -119,6 +119,9 @@ class Application:
         seed_default_data()
         run_server()
         self.config["api_base_url"] = "http://127.0.0.1:8099"
+        self.api.base_url = "http://127.0.0.1:8099"
+        # Brief wait for Flask to be fully ready
+        time.sleep(0.5)
 
         self._root = ctk.CTk()
         self._root.title("X1YEH Account Generator")
@@ -164,6 +167,12 @@ class Application:
         self._login_frame.destroy_particles()
         self._login_frame.destroy()
         self._login_frame = None
+        # Login via API with the default admin key so the token is set
+        for attempt in range(5):
+            result = self.api.login("ADMIN-DEFAULT-KEY")
+            if result.get("success", True) and result.get("token"):
+                break
+            time.sleep(0.4)
         self._load_and_show_dashboard(is_admin=True)
 
     def _on_login_submit(self, license_key: str) -> None:
@@ -187,21 +196,17 @@ class Application:
 
     def _load_and_show_dashboard(self, is_admin: bool = False) -> bool:
         """Load profile + permissions and show the main app frame. Returns True on success."""
-        if is_admin:
-            profile = {}
-            permissions = []
-        else:
-            profile = self.api.get_profile()
-            if not profile.get("success", True):
-                self._show_login()
-                return False
+        profile = self.api.get_profile()
+        if not profile.get("success", True):
+            self._show_login()
+            return False
 
-            permissions_resp = self.api.get_permissions()
-            permissions = permissions_resp.get("permissions", [])
-            if isinstance(permissions, dict):
-                permissions = list(permissions.keys())
-            if isinstance(permissions, str):
-                permissions = [permissions]
+        permissions_resp = self.api.get_permissions()
+        permissions = permissions_resp.get("permissions", [])
+        if isinstance(permissions, dict):
+            permissions = list(permissions.keys())
+        if isinstance(permissions, str):
+            permissions = [permissions]
 
         self._main_app = MainApp(
             parent=self._root,
