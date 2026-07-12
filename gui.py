@@ -329,306 +329,520 @@ class AdminKeyDialog(ctk.CTkToplevel):
 
 
 class AdminFrame(ctk.CTkFrame):
-    """Admin panel for managing licenses, accounts, stock, and logs."""
+    """Full admin panel: Dashboard, Keys, Stock, Logs."""
+
+    SERVER_URL = "http://127.0.0.1:8099"
 
     def __init__(self, parent, api_client):
         super().__init__(parent, fg_color="transparent")
         self.api = api_client
+        self._sub_page = "dashboard"
         self._build()
 
-    def _build(self):
-        ctk.CTkLabel(
-            self,
-            text="Admin Panel",
-            font=ctk.CTkFont(*FONTS["heading"]),
-            text_color=COLORS["text_primary"],
-        ).pack(anchor="w", pady=(10, 5))
-
-        ctk.CTkLabel(
-            self,
-            text="Manage licenses, account stock, and view logs",
-            font=ctk.CTkFont(*FONTS["small"]),
-            text_color=COLORS["text_secondary"],
-        ).pack(anchor="w", pady=(0, 15))
-
-        # Scrollable frame for all admin content
-        self.scroll_canvas = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.scroll_canvas.pack(fill="both", expand=True)
-
-        self._build_create_license_section()
-        self._build_license_list_section()
-        self._build_add_stock_section()
-        self._build_logs_section()
-
-        # Load data
-        self._refresh_licenses()
-        self._refresh_logs()
-
-    # --- Create License ------------------------------------------------------
-
-    def _build_create_license_section(self):
-        card = GlassCard(self.scroll_canvas)
-        card.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            card, text="Create License Key",
-            font=ctk.CTkFont(*FONTS["subheading"]),
-            text_color=COLORS["text_primary"],
-        ).pack(anchor="w", padx=16, pady=(12, 10))
-
-        form = ctk.CTkFrame(card, fg_color="transparent")
-        form.pack(fill="x", padx=16, pady=(0, 12))
-
-        ctk.CTkLabel(form, text="Username", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
-        self.admin_user = ctk.CTkEntry(form, width=140, height=32,
-                                        font=ctk.CTkFont(*FONTS["small"]),
-                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
-                                        placeholder_text="User")
-        self.admin_user.grid(row=0, column=1, padx=4, pady=2)
-
-        ctk.CTkLabel(form, text="Categories", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=2, sticky="w", padx=(8, 8), pady=2)
-        self.admin_cats = ctk.CTkEntry(form, width=180, height=32,
-                                        font=ctk.CTkFont(*FONTS["small"]),
-                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
-                                        placeholder_text="VPN,Steam")
-        self.admin_cats.grid(row=0, column=3, padx=4, pady=2)
-
-        ctk.CTkLabel(form, text="Daily Limit", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=4, sticky="w", padx=(8, 8), pady=2)
-        self.admin_limit = ctk.CTkEntry(form, width=50, height=32,
-                                         font=ctk.CTkFont(*FONTS["small"]),
-                                         fg_color=COLORS["bg_input"], border_color=COLORS["border"])
-        self.admin_limit.insert(0, "5")
-        self.admin_limit.grid(row=0, column=5, padx=4, pady=2)
-
-        ctk.CTkButton(
-            form, text="Create Key", command=self._create_license,
-            width=100, height=32, font=ctk.CTkFont(*FONTS["small"]),
-            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
-            corner_radius=6,
-        ).grid(row=0, column=6, padx=(10, 0), pady=2)
-
-        self.admin_create_status = ctk.CTkLabel(
-            card, text="", font=ctk.CTkFont(*FONTS["small"]),
-            text_color=COLORS["success"],
-        )
-        self.admin_create_status.pack(anchor="w", padx=16, pady=(0, 8))
-
-    # --- License List --------------------------------------------------------
-
-    def _build_license_list_section(self):
-        card = GlassCard(self.scroll_canvas)
-        card.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            card, text="Active Licenses",
-            font=ctk.CTkFont(*FONTS["subheading"]),
-            text_color=COLORS["text_primary"],
-        ).pack(anchor="w", padx=16, pady=(12, 8))
-
-        self.license_list_frame = ctk.CTkFrame(card, fg_color="transparent")
-        self.license_list_frame.pack(fill="x", padx=16, pady=(0, 12))
-
-    # --- Add Stock -----------------------------------------------------------
-
-    def _build_add_stock_section(self):
-        card = GlassCard(self.scroll_canvas)
-        card.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            card, text="Add Account Stock",
-            font=ctk.CTkFont(*FONTS["subheading"]),
-            text_color=COLORS["text_primary"],
-        ).pack(anchor="w", padx=16, pady=(12, 10))
-
-        form = ctk.CTkFrame(card, fg_color="transparent")
-        form.pack(fill="x", padx=16, pady=(0, 12))
-
-        ctk.CTkLabel(form, text="Category", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
-        self.stock_cat = ctk.CTkEntry(form, width=120, height=32,
-                                       font=ctk.CTkFont(*FONTS["small"]),
-                                       fg_color=COLORS["bg_input"], border_color=COLORS["border"],
-                                       placeholder_text="VPN")
-        self.stock_cat.grid(row=0, column=1, padx=4, pady=2)
-
-        ctk.CTkLabel(form, text="Email", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=2, sticky="w", padx=(8, 8), pady=2)
-        self.stock_email = ctk.CTkEntry(form, width=180, height=32,
-                                         font=ctk.CTkFont(*FONTS["small"]),
-                                         fg_color=COLORS["bg_input"], border_color=COLORS["border"],
-                                         placeholder_text="user@example.com")
-        self.stock_email.grid(row=0, column=3, padx=4, pady=2)
-
-        ctk.CTkLabel(form, text="Password", font=ctk.CTkFont(*FONTS["small"]),
-                     text_color=COLORS["text_muted"]).grid(row=0, column=4, sticky="w", padx=(8, 8), pady=2)
-        self.stock_pass = ctk.CTkEntry(form, width=120, height=32,
-                                        font=ctk.CTkFont(*FONTS["small"]),
-                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"],
-                                        placeholder_text="pass")
-        self.stock_pass.grid(row=0, column=5, padx=4, pady=2)
-
-        ctk.CTkButton(
-            form, text="Add", command=self._add_stock,
-            width=70, height=32, font=ctk.CTkFont(*FONTS["small"]),
-            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
-            corner_radius=6,
-        ).grid(row=0, column=6, padx=(10, 0), pady=2)
-
-        self.stock_status = ctk.CTkLabel(
-            card, text="", font=ctk.CTkFont(*FONTS["small"]),
-            text_color=COLORS["success"],
-        )
-        self.stock_status.pack(anchor="w", padx=16, pady=(0, 8))
-
-    # --- Logs ----------------------------------------------------------------
-
-    def _build_logs_section(self):
-        card = GlassCard(self.scroll_canvas)
-        card.pack(fill="x", pady=(0, 10))
-
-        ctk.CTkLabel(
-            card, text="Recent Activity",
-            font=ctk.CTkFont(*FONTS["subheading"]),
-            text_color=COLORS["text_primary"],
-        ).pack(anchor="w", padx=16, pady=(12, 8))
-
-        self.logs_frame = ctk.CTkFrame(card, fg_color="transparent")
-        self.logs_frame.pack(fill="x", padx=16, pady=(0, 12))
-
-    # --- Actions -------------------------------------------------------------
-
-    def _create_license(self):
-        username = self.admin_user.get().strip() or "User"
-        cats_raw = self.admin_cats.get().strip()
-        permissions = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else ["VPN", "Netflix", "Steam", "Discord", "Rockstar"]
-        try:
-            daily_limit = int(self.admin_limit.get().strip())
-        except ValueError:
-            daily_limit = 5
-
-        def _callback(result):
-            if not result:
-                return
-            if result.get("success"):
-                key = result.get("license_key", "")
-                self.admin_create_status.configure(
-                    text=f"Created: {key}", text_color=COLORS["success"])
-                self._refresh_licenses()
-                self.winfo_toplevel().clipboard_clear()
-                self.winfo_toplevel().clipboard_append(key)
-                Toast.show(self.winfo_toplevel(), f"Key created and copied!", "success")
-            else:
-                self.admin_create_status.configure(
-                    text=result.get("error", "Failed"), text_color=COLORS["danger"])
-
-        import requests, threading
-        def _worker():
+    def _api(self, method: str, path: str, json_data=None, callback=None):
+        """Async API call to the local server."""
+        import requests as _r
+        def _w():
             try:
-                resp = requests.post(
-                    "http://127.0.0.1:8099/admin/licenses",
-                    json={"username": username, "permissions": permissions, "daily_limit": daily_limit},
-                    timeout=10,
-                )
-                self.after(0, lambda: _callback(resp.json()))
+                url = f"{self.SERVER_URL}{path}"
+                if method == "GET":
+                    r = _r.get(url, timeout=10, params=json_data)
+                elif method == "POST":
+                    r = _r.post(url, json=json_data, timeout=10)
+                elif method == "DELETE":
+                    r = _r.delete(url, timeout=10)
+                elif method == "PUT":
+                    r = _r.put(url, json=json_data, timeout=10)
+                else:
+                    r = _r.get(url, timeout=10)
+                data = r.json()
+                self.after(0, lambda: callback(data))
             except Exception as e:
-                self.after(0, lambda: _callback({"success": False, "error": str(e)}))
-        threading.Thread(target=_worker, daemon=True).start()
+                self.after(0, lambda: callback({"success": False, "error": str(e)}))
+        threading.Thread(target=_w, daemon=True).start()
 
-    def _refresh_licenses(self):
-        import requests, threading
-        def _worker():
-            try:
-                resp = requests.get("http://127.0.0.1:8099/admin/licenses", timeout=10)
-                data = resp.json()
-                self.after(0, lambda: self._render_licenses(data.get("licenses", [])))
-            except Exception:
-                pass
-        threading.Thread(target=_worker, daemon=True).start()
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
 
-    def _render_licenses(self, licenses):
-        for w in self.license_list_frame.winfo_children():
+    def _build(self):
+        ctk.CTkLabel(self, text="Admin Panel", font=ctk.CTkFont(*FONTS["heading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", pady=(10, 10))
+
+        # Tab bar
+        tab_frame = ctk.CTkFrame(self, fg_color="transparent")
+        tab_frame.pack(fill="x")
+        self._tabs = {}
+        for tab_id, label in [("dashboard", "Dashboard"), ("keys", "Keys"),
+                               ("stock", "Stock"), ("logs", "Logs")]:
+            btn = ctk.CTkButton(
+                tab_frame, text=label, width=90, height=30,
+                font=ctk.CTkFont(*FONTS["small"]),
+                fg_color=COLORS["bg_card"], hover_color=COLORS["sidebar_hover"],
+                text_color=COLORS["text_secondary"],
+                command=lambda t=tab_id: self._show_sub_page(t),
+            )
+            btn.pack(side="left", padx=(0, 4))
+            self._tabs[tab_id] = btn
+
+        ctk.CTkFrame(self, height=1, fg_color=COLORS["border"]).pack(fill="x", pady=(8, 10))
+
+        # Content container
+        self._sub_content = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self._sub_content.pack(fill="both", expand=True)
+
+        self._show_sub_page("dashboard")
+
+    def _show_sub_page(self, page_id: str):
+        self._sub_page = page_id
+        for pid, btn in self._tabs.items():
+            if pid == page_id:
+                btn.configure(fg_color=COLORS["accent"], text_color="#fff")
+            else:
+                btn.configure(fg_color=COLORS["bg_card"], text_color=COLORS["text_secondary"])
+
+        for w in self._sub_content.winfo_children():
             w.destroy()
 
-        if not licenses:
-            ctk.CTkLabel(self.license_list_frame, text="No licenses found.",
-                         font=ctk.CTkFont(*FONTS["small"]),
-                         text_color=COLORS["text_muted"]).pack(pady=4)
+        if page_id == "dashboard":
+            self._build_dashboard()
+        elif page_id == "keys":
+            self._build_keys()
+        elif page_id == "stock":
+            self._build_stock()
+        elif page_id == "logs":
+            self._build_logs()
+
+    # ------------------------------------------------------------------
+    # Dashboard
+    # ------------------------------------------------------------------
+
+    def _build_dashboard(self):
+        self._api("GET", "/admin/stats", callback=self._render_dashboard)
+
+    def _render_dashboard(self, data):
+        ctk.CTkLabel(self._sub_content, text="Dashboard", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", pady=(0, 8))
+        if not data.get("success"):
+            ctk.CTkLabel(self._sub_content, text="Failed to load stats.",
+                         font=ctk.CTkFont(*FONTS["small"]), text_color=COLORS["danger"]).pack()
             return
 
+        licenses = data.get("licenses", {})
+        stock = data.get("stock", {})
+        gen = data.get("generations", {})
+
+        cards = [
+            ("Total Licenses", licenses.get("total", 0)),
+            ("Active Keys", licenses.get("active", 0)),
+            ("Disabled Keys", licenses.get("disabled", 0)),
+            ("Total Stock", stock.get("total", 0)),
+            ("Available Stock", stock.get("available", 0)),
+            ("Used Stock", stock.get("used", 0)),
+            ("Generated Today", gen.get("today", 0)),
+            ("Total Generated", gen.get("total", 0)),
+        ]
+
+        row_frame = None
+        for i, (label, value) in enumerate(cards):
+            if i % 3 == 0:
+                row_frame = ctk.CTkFrame(self._sub_content, fg_color="transparent")
+                row_frame.pack(fill="x", pady=2)
+            card = GlassCard(row_frame)
+            card.pack(side="left", padx=4, fill="x", expand=True)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"]).pack(padx=12, pady=(8, 0))
+            ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=26, weight="bold"),
+                         text_color=COLORS["accent"]).pack(padx=12, pady=(0, 8))
+
+    # ------------------------------------------------------------------
+    # Keys
+    # ------------------------------------------------------------------
+
+    def _build_keys(self):
+        # Create key form
+        card = GlassCard(self._sub_content)
+        card.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(card, text="Create License Key", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", padx=14, pady=(10, 6))
+
+        f1 = ctk.CTkFrame(card, fg_color="transparent")
+        f1.pack(fill="x", padx=14, pady=4)
+
+        ctk.CTkLabel(f1, text="Username", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", padx=2)
+        self._key_user = ctk.CTkEntry(f1, width=130, height=30, font=ctk.CTkFont(*FONTS["small"]),
+                                       fg_color=COLORS["bg_input"], border_color=COLORS["border"])
+        self._key_user.grid(row=0, column=1, padx=2)
+
+        ctk.CTkLabel(f1, text="Daily Limit", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=2, sticky="w", padx=(10, 2))
+        self._key_limit = ctk.CTkEntry(f1, width=50, height=30, font=ctk.CTkFont(*FONTS["small"]),
+                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"])
+        self._key_limit.insert(0, "5")
+        self._key_limit.grid(row=0, column=3, padx=2)
+
+        ctk.CTkLabel(f1, text="Max Uses", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=4, sticky="w", padx=(10, 2))
+        self._key_maxuses = ctk.CTkEntry(f1, width=50, height=30, font=ctk.CTkFont(*FONTS["small"]),
+                                          fg_color=COLORS["bg_input"], border_color=COLORS["border"])
+        self._key_maxuses.grid(row=0, column=5, padx=2)
+
+        ctk.CTkLabel(f1, text="Expiry", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).grid(row=0, column=6, sticky="w", padx=(10, 2))
+        self._key_expiry = ctk.CTkOptionMenu(
+            f1, values=["30 days", "7 days", "1 day", "90 days", "Lifetime", "Custom"],
+            font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["bg_input"],
+            button_color=COLORS["accent"], button_hover_color=COLORS["accent_hover"],
+            width=110, height=30,
+        )
+        self._key_expiry.set("30 days")
+        self._key_expiry.grid(row=0, column=7, padx=2)
+
+        self._key_custom_date = ctk.CTkEntry(f1, width=110, height=30, font=ctk.CTkFont(*FONTS["small"]),
+                                              fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                              placeholder_text="YYYY-MM-DD")
+
+        ctk.CTkButton(f1, text="Create", command=self._do_create_key, width=70, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["accent"],
+                      hover_color=COLORS["accent_hover"],
+                      corner_radius=6).grid(row=0, column=8, padx=(10, 0))
+
+        # Permissions checkboxes
+        ctk.CTkLabel(card, text="Permissions", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).pack(anchor="w", padx=14, pady=(8, 2))
+        cb_frame = ctk.CTkFrame(card, fg_color="transparent")
+        cb_frame.pack(fill="x", padx=14, pady=(0, 8))
+
+        self._perm_vars: dict[str, tkinter.BooleanVar] = {}
+        from storage import ALL_GENERATORS
+        for idx, cat in enumerate(ALL_GENERATORS):
+            var = tkinter.BooleanVar(value=True)
+            cb = ctk.CTkCheckBox(cb_frame, text=cat, variable=var,
+                                  font=ctk.CTkFont(*FONTS["small"]),
+                                  fg_color=COLORS["accent"], border_color=COLORS["border"],
+                                  text_color=COLORS["text_secondary"],
+                                  checkbox_width=16, checkbox_height=16)
+            cb.grid(row=idx // 4, column=idx % 4, sticky="w", padx=6, pady=2)
+            self._perm_vars[cat] = var
+
+        self._key_status = ctk.CTkLabel(card, text="", font=ctk.CTkFont(*FONTS["small"]))
+        self._key_status.pack(anchor="w", padx=14, pady=(0, 6))
+
+        # License list
+        card2 = GlassCard(self._sub_content)
+        card2.pack(fill="x")
+        ctk.CTkLabel(card2, text="Existing Keys", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", padx=14, pady=(10, 6))
+        self._key_list_frame = ctk.CTkFrame(card2, fg_color="transparent")
+        self._key_list_frame.pack(fill="x", padx=14, pady=(0, 10))
+
+        self._api("GET", "/admin/licenses", callback=self._render_keys)
+
+    def _render_keys(self, data):
+        frame = self._key_list_frame
+        for w in frame.winfo_children():
+            w.destroy()
+        licenses = data.get("licenses", [])
+        if not licenses:
+            ctk.CTkLabel(frame, text="No keys found.", font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"]).pack()
+            return
         for lic in licenses:
-            row = ctk.CTkFrame(self.license_list_frame, fg_color="transparent")
-            row.pack(fill="x", pady=1)
-            key_short = lic["license_key"][:20] + "..."
-            perms = ", ".join(lic.get("permissions", []))
-            info = f"{key_short}  |  {lic['username']}  |  {perms}  |  Limit: {lic['daily_limit']}/day  |  {lic['status']}"
+            row = ctk.CTkFrame(frame, fg_color=COLORS["bg_card"], corner_radius=6)
+            row.pack(fill="x", pady=2, ipady=2)
+
+            key_str = lic["license_key"]
+            perms = ", ".join(lic.get("permissions", [])) or "None"
+            status_color = COLORS["success"] if lic["status"] == "active" else ("#f59e0b" if lic["status"] == "expired" else COLORS["danger"])
+            info = f"{key_str[:22]}...  |  {lic['username']}"
             ctk.CTkLabel(row, text=info, font=ctk.CTkFont("Consolas", 10),
-                         text_color=COLORS["text_secondary"]).pack(side="left", padx=2)
-            ctk.CTkButton(row, text="Copy", width=50, height=22,
-                          font=ctk.CTkFont("Segoe UI", 9),
+                         text_color=COLORS["text_secondary"], anchor="w").pack(side="left", padx=8)
+
+            status_lbl = ctk.CTkLabel(row, text=lic["status"].upper(), font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                                       text_color=status_color, width=60)
+            status_lbl.pack(side="left", padx=4)
+
+            exp = lic.get("expiry_date") or "Never"
+            ctk.CTkLabel(row, text=f"Exp: {exp}", font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"], width=100).pack(side="left")
+
+            ctk.CTkButton(row, text="Copy", width=45, height=22, font=ctk.CTkFont("Segoe UI", 9),
                           fg_color=COLORS["bg_card"], hover_color=COLORS["sidebar_hover"],
-                          command=lambda k=lic["license_key"]: self._copy_key(k),
+                          command=lambda k=key_str: self._copy_text(k),
+                          corner_radius=4).pack(side="right", padx=2)
+            ctk.CTkButton(row, text="Toggle", width=50, height=22, font=ctk.CTkFont("Segoe UI", 9),
+                          fg_color=("#22c55e" if lic["status"] == "active" else COLORS["accent"]),
+                          hover_color=("#16a34a" if lic["status"] == "active" else COLORS["accent_hover"]),
+                          command=lambda lid=lic["id"]: self._toggle_key(lid),
+                          corner_radius=4).pack(side="right", padx=2)
+            ctk.CTkButton(row, text="Del", width=40, height=22, font=ctk.CTkFont("Segoe UI", 9),
+                          fg_color=COLORS["danger"], hover_color="#dc2626",
+                          command=lambda lid=lic["id"]: self._delete_key(lid),
                           corner_radius=4).pack(side="right", padx=2)
 
-    def _copy_key(self, key: str):
-        self.winfo_toplevel().clipboard_clear()
-        self.winfo_toplevel().clipboard_append(key)
-        Toast.show(self.winfo_toplevel(), "Key copied!", "success")
+    def _do_create_key(self):
+        username = self._key_user.get().strip() or "User"
+        try:
+            daily_limit = int(self._key_limit.get().strip())
+        except ValueError:
+            daily_limit = 5
+        try:
+            max_uses_raw = self._key_maxuses.get().strip()
+            max_uses = int(max_uses_raw) if max_uses_raw else None
+        except ValueError:
+            max_uses = None
 
-    def _add_stock(self):
-        cat = self.stock_cat.get().strip()
-        email = self.stock_email.get().strip()
-        pw = self.stock_pass.get().strip()
-        if not cat or not email or not pw:
-            self.stock_status.configure(text="All fields required", text_color=COLORS["danger"])
-            return
-        import requests, threading
-        def _worker():
-            try:
-                resp = requests.post(
-                    "http://127.0.0.1:8099/admin/stock",
-                    json={"category": cat, "email": email, "password": pw},
-                    timeout=10,
-                )
-                data = resp.json()
-                if data.get("success"):
-                    self.after(0, lambda: self.stock_status.configure(text="Stock added!", text_color=COLORS["success"]))
-                    self.after(0, self._refresh_logs)
-                else:
-                    self.after(0, lambda: self.stock_status.configure(text=data.get("error", "Failed"), text_color=COLORS["danger"]))
-            except Exception as e:
-                self.after(0, lambda: self.stock_status.configure(text=str(e), text_color=COLORS["danger"]))
-        threading.Thread(target=_worker, daemon=True).start()
+        expiry = self._key_expiry.get()
+        expiry_map = {"1 day": 1, "7 days": 7, "30 days": 30, "90 days": 90, "Lifetime": "lifetime", "Custom": "custom"}
+        expiry_days = expiry_map.get(expiry, 30)
+        custom_expiry = None
+        if expiry_days == "custom":
+            custom_expiry = self._key_custom_date.get().strip() or None
 
-    def _refresh_logs(self):
-        import requests, threading
-        def _worker():
-            try:
-                resp = requests.get("http://127.0.0.1:8099/admin/logs", timeout=10)
-                data = resp.json()
-                self.after(0, lambda: self._render_logs(data.get("admin_logs", [])))
-            except Exception:
-                pass
-        threading.Thread(target=_worker, daemon=True).start()
+        permissions = [cat for cat, var in self._perm_vars.items() if var.get()]
 
-    def _render_logs(self, logs):
-        for w in self.logs_frame.winfo_children():
+        def _cb(resp):
+            if resp.get("success"):
+                k = resp.get("license_key", "")
+                self._key_status.configure(text=f"Created: {k}", text_color=COLORS["success"])
+                self._copy_text(k)
+                self._api("GET", "/admin/licenses", callback=self._render_keys)
+            else:
+                self._key_status.configure(text=resp.get("error", "Failed"), text_color=COLORS["danger"])
+
+        self._api("POST", "/admin/licenses",
+                   json={"username": username, "permissions": permissions, "daily_limit": daily_limit,
+                         "max_uses": max_uses, "expiry": expiry_days, "custom_expiry": custom_expiry},
+                   callback=_cb)
+
+    def _toggle_key(self, lic_id: int):
+        def _cb(resp):
+            if resp.get("success"):
+                self._api("GET", "/admin/licenses", callback=self._render_keys)
+        self._api("POST", f"/admin/licenses/{lic_id}/toggle", callback=_cb)
+
+    def _delete_key(self, lic_id: int):
+        def _cb(resp):
+            if resp.get("success"):
+                self._api("GET", "/admin/licenses", callback=self._render_keys)
+        self._api("DELETE", f"/admin/licenses/{lic_id}", callback=_cb)
+
+    def _copy_text(self, text: str):
+        top = self.winfo_toplevel()
+        top.clipboard_clear()
+        top.clipboard_append(text)
+        Toast.show(top, "Copied!", "success")
+
+    # ------------------------------------------------------------------
+    # Stock
+    # ------------------------------------------------------------------
+
+    def _build_stock(self):
+        card = GlassCard(self._sub_content)
+        card.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(card, text="Stock Management", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", padx=14, pady=(10, 6))
+
+        # Bulk paste
+        ctk.CTkLabel(card, text="Bulk Import (email:password, one per line)", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).pack(anchor="w", padx=14)
+        self._stock_text = ctk.CTkTextbox(card, height=100, font=ctk.CTkFont("Consolas", 11),
+                                           fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                           border_width=1, corner_radius=6, wrap="none")
+        self._stock_text.pack(fill="x", padx=14, pady=(2, 8))
+
+        f1 = ctk.CTkFrame(card, fg_color="transparent")
+        f1.pack(fill="x", padx=14, pady=4)
+        ctk.CTkLabel(f1, text="Category", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).pack(side="left")
+        self._stock_cat = ctk.CTkEntry(f1, width=130, height=30, font=ctk.CTkFont(*FONTS["small"]),
+                                        fg_color=COLORS["bg_input"], border_color=COLORS["border"])
+        self._stock_cat.pack(side="left", padx=6)
+
+        ctk.CTkButton(f1, text="Import", command=self._do_bulk_import, width=70, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["accent"],
+                      hover_color=COLORS["accent_hover"], corner_radius=6).pack(side="left", padx=4)
+        ctk.CTkButton(f1, text="Dedup", command=self._do_dedup, width=60, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["bg_card"],
+                      hover_color=COLORS["sidebar_hover"], corner_radius=6).pack(side="left", padx=4)
+        ctk.CTkButton(f1, text="Del Used", command=self._do_del_used, width=70, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["danger"],
+                      hover_color="#dc2626", corner_radius=6).pack(side="right", padx=2)
+        ctk.CTkButton(f1, text="Export", command=self._do_export, width=60, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["bg_card"],
+                      hover_color=COLORS["sidebar_hover"], corner_radius=6).pack(side="right", padx=2)
+        ctk.CTkButton(f1, text="Clear", command=self._do_clear_stock, width=55, height=30,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color="#b91c1c",
+                      hover_color="#7f1d1d", corner_radius=6).pack(side="right", padx=2)
+
+        self._stock_status = ctk.CTkLabel(card, text="", font=ctk.CTkFont(*FONTS["small"]))
+        self._stock_status.pack(anchor="w", padx=14, pady=(4, 8))
+
+        # Stock list
+        ctk.CTkLabel(self._sub_content, text="Current Stock", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", pady=(8, 4))
+
+        f_search = ctk.CTkFrame(self._sub_content, fg_color="transparent")
+        f_search.pack(fill="x")
+        self._stock_search = ctk.CTkEntry(f_search, width=200, height=28, font=ctk.CTkFont(*FONTS["small"]),
+                                           fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                           placeholder_text="Search email...")
+        self._stock_search.pack(side="left")
+        ctk.CTkButton(f_search, text="Search", command=self._refresh_stock, width=60, height=28,
+                      font=ctk.CTkFont(*FONTS["small"]), fg_color=COLORS["accent"],
+                      hover_color=COLORS["accent_hover"], corner_radius=6).pack(side="left", padx=4)
+
+        self._stock_list = ctk.CTkScrollableFrame(self._sub_content, fg_color="transparent", height=250)
+        self._stock_list.pack(fill="x", pady=(6, 0))
+
+        self._refresh_stock()
+
+    def _refresh_stock(self):
+        q = self._stock_search.get().strip() if hasattr(self, '_stock_search') else ""
+        self._api("GET", "/admin/stock", {"search": q}, callback=self._render_stock)
+
+    def _render_stock(self, data):
+        frame = self._stock_list
+        for w in frame.winfo_children():
             w.destroy()
-        if not logs:
-            ctk.CTkLabel(self.logs_frame, text="No activity yet.",
-                         font=ctk.CTkFont(*FONTS["small"]),
-                         text_color=COLORS["text_muted"]).pack(pady=4)
+
+        accounts = data.get("accounts", [])
+        summary = data.get("summary", {})
+        cats = summary.get("categories", {})
+
+        # Summary bar
+        summary_row = ctk.CTkFrame(frame, fg_color="transparent")
+        summary_row.pack(fill="x", pady=(0, 6))
+        for cat_name, cat_info in cats.items():
+            lbl = ctk.CTkLabel(
+                summary_row,
+                text=f"{cat_name}: {cat_info['remaining']}/{cat_info['total']}",
+                font=ctk.CTkFont(*FONTS["small"]),
+                text_color=COLORS["accent"],
+            )
+            lbl.pack(side="left", padx=6)
+
+        if not accounts:
+            ctk.CTkLabel(frame, text="No stock found.", font=ctk.CTkFont(*FONTS["small"]),
+                         text_color=COLORS["text_muted"]).pack(pady=8)
             return
-        for log in logs[:10]:
-            ctk.CTkLabel(
-                self.logs_frame,
-                text=f"{log['created_at']}  {log['action']}  {log.get('detail', '')}",
-                font=ctk.CTkFont("Consolas", 10),
-                text_color=COLORS["text_muted"],
-                anchor="w",
-            ).pack(fill="x", pady=1)
+
+        ctk.CTkLabel(frame, text=f"{len(accounts)} accounts shown", font=ctk.CTkFont(*FONTS["small"]),
+                     text_color=COLORS["text_muted"]).pack(anchor="w", pady=(0, 4))
+
+        for acc in accounts[:100]:
+            row = ctk.CTkFrame(frame, fg_color=COLORS["bg_card"], corner_radius=4)
+            row.pack(fill="x", pady=1, ipady=1)
+            used_marker = " *USED*" if acc["used"] else ""
+            ctk.CTkLabel(row, text=f"[{acc['category']}]{used_marker} {acc['email']}:{acc['password']}",
+                         font=ctk.CTkFont("Consolas", 10), text_color=COLORS["text_secondary"],
+                         anchor="w").pack(side="left", padx=6)
+            ctk.CTkButton(row, text="X", width=24, height=18, font=ctk.CTkFont("Segoe UI", 8),
+                          fg_color=COLORS["danger"], hover_color="#dc2626",
+                          command=lambda aid=acc["id"]: self._del_single_stock(aid),
+                          corner_radius=3).pack(side="right", padx=4)
+
+    def _do_bulk_import(self):
+        cat = self._stock_cat.get().strip()
+        lines = self._stock_text.get("1.0", "end-1c").strip()
+        if not cat or not lines:
+            self._stock_status.configure(text="Category and accounts required.", text_color=COLORS["danger"])
+            return
+        def _cb(resp):
+            if resp.get("success"):
+                self._stock_status.configure(
+                    text=f"Added {resp['added']}, dup {resp.get('duplicates', 0)}",
+                    text_color=COLORS["success"])
+                self._stock_text.delete("1.0", "end")
+                self._refresh_stock()
+            else:
+                self._stock_status.configure(text=resp.get("error", "Failed"), text_color=COLORS["danger"])
+        self._api("POST", "/admin/stock/bulk", {"category": cat, "lines": lines}, callback=_cb)
+
+    def _del_single_stock(self, aid: int):
+        def _cb(resp):
+            if resp.get("success"):
+                self._refresh_stock()
+        self._api("DELETE", f"/admin/stock/{aid}", callback=_cb)
+
+    def _do_dedup(self):
+        def _cb(resp):
+            self._stock_status.configure(text=f"Duplicates removed: {resp.get('removed', 0)}",
+                                          text_color=COLORS["success"])
+            self._refresh_stock()
+        self._api("POST", "/admin/stock/dedup", callback=_cb)
+
+    def _do_del_used(self):
+        def _cb(resp):
+            self._stock_status.configure(text=f"Used deleted: {resp.get('deleted', 0)}",
+                                          text_color=COLORS["success"])
+            self._refresh_stock()
+        self._api("POST", "/admin/stock/delete-used", callback=_cb)
+
+    def _do_export(self):
+        def _cb(resp):
+            data = resp.get("data", "")
+            if data:
+                self._stock_text.delete("1.0", "end")
+                self._stock_text.insert("1.0", data)
+                self._stock_status.configure(text="Exported to paste area.", text_color=COLORS["success"])
+        self._api("GET", "/admin/stock/export", callback=_cb)
+
+    def _do_clear_stock(self):
+        def _cb(resp):
+            self._stock_status.configure(text=f"Cleared {resp.get('deleted', 0)} accounts.",
+                                          text_color=COLORS["success"])
+            self._refresh_stock()
+        self._api("POST", "/admin/stock/clear", callback=_cb)
+
+    # ------------------------------------------------------------------
+    # Logs
+    # ------------------------------------------------------------------
+
+    def _build_logs(self):
+        ctk.CTkLabel(self._sub_content, text="Activity Logs", font=ctk.CTkFont(*FONTS["subheading"]),
+                     text_color=COLORS["text_primary"]).pack(anchor="w", pady=(0, 6))
+
+        ctk.CTkLabel(self._sub_content, text="Admin Logs", font=ctk.CTkFont(*FONTS["body"]),
+                     text_color=COLORS["text_secondary"]).pack(anchor="w", pady=(4, 2))
+        self._admin_logs_frame = ctk.CTkFrame(self._sub_content, fg_color="transparent")
+        self._admin_logs_frame.pack(fill="x")
+
+        ctk.CTkLabel(self._sub_content, text="Generation Logs", font=ctk.CTkFont(*FONTS["body"]),
+                     text_color=COLORS["text_secondary"]).pack(anchor="w", pady=(10, 2))
+        self._gen_logs_frame = ctk.CTkFrame(self._sub_content, fg_color="transparent")
+        self._gen_logs_frame.pack(fill="x")
+
+        self._api("GET", "/admin/logs", callback=self._render_logs_page)
+
+    def _render_logs_page(self, data):
+        for f in (self._admin_logs_frame, self._gen_logs_frame):
+            for w in f.winfo_children():
+                w.destroy()
+
+        admin_logs = data.get("admin_logs", [])
+        gen_logs = data.get("gen_logs", [])
+
+        if not admin_logs:
+            ctk.CTkLabel(self._admin_logs_frame, text="No admin activity.",
+                         font=ctk.CTkFont(*FONTS["small"]), text_color=COLORS["text_muted"]).pack()
+        for log in admin_logs[:20]:
+            txt = f"{log['created_at']}  {log['action']}  {log.get('detail', '')}"
+            ctk.CTkLabel(self._admin_logs_frame, text=txt, font=ctk.CTkFont("Consolas", 10),
+                         text_color=COLORS["text_muted"], anchor="w").pack(fill="x")
+
+        if not gen_logs:
+            ctk.CTkLabel(self._gen_logs_frame, text="No generations yet.",
+                         font=ctk.CTkFont(*FONTS["small"]), text_color=COLORS["text_muted"]).pack()
+        for log in gen_logs[:30]:
+            uname = log.get("username", "")
+            txt = f"{log['created_at']}  {log['license_key'][:10]}...  {log['category']}  {log.get('email', '')}"
+            if uname:
+                txt += f"  [{uname}]"
+            color = COLORS["success"] if log["success"] else COLORS["danger"]
+            ctk.CTkLabel(self._gen_logs_frame, text=txt, font=ctk.CTkFont("Consolas", 10),
+                         text_color=color, anchor="w").pack(fill="x")
 
 
 class LoginFrame(ctk.CTkFrame):
